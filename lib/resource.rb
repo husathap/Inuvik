@@ -4,10 +4,6 @@ module Resource
 
 	# Edit this list to get more pre_loaded images in the game.
 	@image_load_manifest = {
-		:title => "./res/img/title.png",
-		:loading => "./res/img/loading.png",
-		:inuvik => "./res/img/inuvik.png",
-		:inuvik2 => "./res/img/inuvik2.png",
 		:leftnav => "./res/img/leftnav.png",
 		:rightnav => "./res/img/rightnav.png"
 	}

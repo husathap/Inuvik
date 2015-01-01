@@ -1,18 +1,39 @@
-$LOAD_PATH << '.'
 
+# An abstract class for DialogNode-derived classes.
 class DialogNode
+
+	# Virtual functions for button down and up events propagation.
 	def button_down(id); end
 	def button_up(id); end
 
+	# Virtual function for update.
 	def update
 		return true
 	end
 
+	# Virtual function for drawing.
 	def draw; end
 end
 
+#### DialogNode-derived classes ####
+
+# Execute an anonymous function. Useful for delayed/lazy computation.
+class Func < DialogNode
+	def initialize(func)
+		@func = func
+	end
+	
+	def update
+		@func.call
+		return true
+	end
+end
+
+# Show a dialog of a character speaking.
 class Speak < DialogNode
 
+	# Create a new speaking dialog.
+	# text: The text to be shown on screen.
 	def initialize(text)
 		@text = text
 		@text_image = nil
@@ -54,8 +75,11 @@ class Speak < DialogNode
 	end
 end
 
+# Show a dialog indicates an interaction between the engine and the player.
 class Alert < DialogNode
 
+	# Create a new speaking dialog.
+	# text: The text to be shown on screen.
 	def initialize(text)
 		@text = text
 		@text_image = nil
@@ -97,8 +121,12 @@ class Alert < DialogNode
 	end
 end
 
+# Change the background of the dialog.
 class Background < DialogNode
 
+	# Create a new background to shown on screen.
+	# image: a Gosu::Image object or a String which represents a path to an image file.
+	# dialog_branch: a DialogBranch to be manipulated.
 	def initialize(image, dialog_branch)
 		@dia_b = dialog_branch
 	
@@ -130,7 +158,13 @@ class Background < DialogNode
 	end
 end
 
+# Force the player to make a decision.
 class Decision < DialogNode
+
+	# Create a new decision.
+	# var_name: The name of the variable to store the decision.
+	# temp: A Boolean value indicates whether the variable should be stored temporarily or permanently.
+	# choices: An array that contains Strings that represent the choices that the player can make.
 	def initialize(var_name, temp, choices)
 		@var_name = var_name
 		@temp = temp
@@ -199,8 +233,13 @@ class Decision < DialogNode
 	end
 end
 
+# Ask for text input from the player and stores it.
 class TextInput < DialogNode
 	
+	# Create a new text input.
+	# var_name: The name of the variable to store the input.
+	# temp: A Boolean value indicates whether the variable should be stored temporarily or permanently.
+	# choices: An array that contains Strings that represent the choices that the player can make. 
 	def initialize(var_name, temp, question)
 		@var_name = var_name
 		@temp = temp
@@ -269,9 +308,53 @@ class TextInput < DialogNode
 	end
 end
 
+# Play a song.
+class PlaySong < DialogNode
+	
+	# Play a song
+	# - song_path: The path to the song file.
+	def initialize(song_path)
+		@song_path = song_path
+	end
+	
+	def update
+		$window.cur_song = Gosu::Song.new($window, @song_path)
+		$window.cur_song.play(true)
+		return true
+	end
+end
+
+# Stop a song.
+class StopSong < DialogNode
+	
+	def update
+		if $window.cur_song != nil
+			$window.cur_song.stop
+		end
+		$window.cur_song = nil
+		return true
+	end
+end
+
+#### DialogBranch data structure ####
+
+# A section of the cutscene that the player has to suffer through.
 class DialogBranch
 	@@mouse_x = 0
 	@@mouse_y = 0
+	
+	def initialize
+		@dialogs = []
+		@index = 0
+		@next_branch = Proc.new { nil }
+		@finished = false
+		
+		@bg_image = nil
+		@bg_color = Gosu::Color.new(0, 255, 255, 255)
+		@no_bg_color = Gosu::Color.new(0, 0, 0, 0)
+		
+		@hide_scene = false
+	end
 	
 	def mouse_x= v; @@mouse_x = v; end
 	def mouse_y= v; @@mouse_y = v; end
@@ -287,25 +370,8 @@ class DialogBranch
 			@dialogs[@index].button_up(id)
 		end
 	end
-
-	def initialize
-		@dialogs = []
-		@index = 0
-		@next_branch = Proc.new { nil }
-		@finished = false
-		
-		@bg_image = nil
-		@bg_color = Gosu::Color.new(0, 255, 255, 255)
-		@no_bg_color = Gosu::Color.new(0, 0, 0, 0)
-		
-		@hide_scene = false
-	end
 	
 	attr_accessor :bg_image, :bg_color
-	'''def bg_image; @bg_image; end
-	def bg_image= v; @bg_image = v; end
-	def bg_color; @bg_color;end
-	def bg_color= v; @bg_color = v; end'''
 	
 	def hide_scene;
 		@hide_scene = true 
@@ -349,29 +415,41 @@ class DialogBranch
 			@dialogs[@index].draw
 		end
 	end
-end
-
-def get_d
-	d = DialogBranch.new
-	e = DialogBranch.new
-
-	d.add(Background.new("./res/img/inuvik.png", d))
-	d.add(TextInput.new("name", true, "Your name please!"))
-	d.add(Decision.new("mudkip", true, ["Bring me mudkips!", "NO!!", "HI!"]))
-	d.add(Alert.new("This is a new alert!"))
-	d.add(Speak.new("HI! I am Cat."))
-	d.add(Speak.new("Do you like me?"))
-	d.add(Speak.new("..."))
-	d.add(Speak.new("But I don't like you at all!"))
-
-	#e.add(Background.new("./res/img/inuvik2.png", e))
-	e.add(Background.new(nil, e))
-	e.add(Speak.new("HI! I am Doge."))
-	e.add(Speak.new("Do you like Doge?"))
-	e.add(Speak.new("!!!"))
-	e.add(Speak.new("But I don't like Doge at all!"))
-	d.add(Alert.new("KTHXBAI!"))
-
-	d.set_next_branch(Proc.new { e })
-	return d
+	
+	# Curried functions for convenience!
+	def background(image)
+		self.add(Background.new(image), self)
+	end
+	
+	def text_input(var_name, is_temp, question)
+		self.add(TextInput.new(var_name, is_temp, question))
+	end
+	
+	def decision(var_name, is_temp, answer_array)
+		self.add(Decision.new(var_name, is_temp, answer_array))
+	end
+	
+	def alert(text)
+		self.add(Alert.new(text))
+	end
+	
+	def speak(text)
+		self.add(Speak.new(text))
+	end
+	
+	def play_song(song_path)
+		self.add(PlaySong.new(song_path))
+	end
+	
+	def stop_song
+		self.add(StopSong.new)
+	end
+	
+	def func(func)
+		self.add(Func.new(func))
+	end
+	
+	def start
+		$window.cur_dialog = self
+	end
 end
